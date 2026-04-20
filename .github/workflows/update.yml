@@ -1,26 +1,36 @@
-name: Update JSON
+name: Auto-Sync Google Sheets to JSON
 
 on:
-  push:
-    paths:
-      - 'database.csv'
+  schedule:
+    - cron: '0 * * * *' # Si esegue automaticamente ogni ora (al minuto 0). 
+  workflow_dispatch: # Ti fa comparire un pulsante su GitHub per forzare l'aggiornamento a mano
+
+permissions:
+  contents: write # Permesso necessario al bot per salvare il nuovo file json nel repository
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Clona il repository
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - run: node convert.js
+      - name: Installa dipendenze (node-fetch)
+        run: npm install
 
-      - run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+      - name: Scarica dal tuo GSheet e aggiorna tracks.json
+        run: node convert.js
+
+      - name: Salva su GitHub (solo se ci sono novità)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tracks.json
-          git commit -m "update json" || echo "no changes"
-          git push
+          # Se tracks.json è cambiato, fai il commit. Altrimenti, non fare nulla (evita errori rossi)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update: nuove tracce da Google Sheets" && git push)
